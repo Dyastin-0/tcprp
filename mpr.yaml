@@ -1,0 +1,77 @@
+proxies:
+  dyastin.dev:
+    target: "http://localhost:3111"
+    routes:
+      - pattern: "/"
+        target: "http://localhost:3111"
+
+  grafana.dyastin.dev:
+    target: "http://localhost:3000"
+    routes:
+      - pattern: "/"
+        target: "http://localhost:3000"
+
+  '*.wormhole.dyastin.dev':
+    target: "localhost:8889"
+    rate_limit:
+      rate: 0
+      burst: 0
+      cooldown: 0
+    routes:
+      - pattern: "/"
+        target: "localhost:8889"
+
+  echos.dyastin.dev:
+    target: "http://localhost:42020"
+    rate_limit:
+      rate: 0
+      burst: 0
+      cooldown: 0
+    routes:
+      - pattern: "/"
+        target: "http://localhost:42020"
+      
+      - pattern: "/api"
+        target: "http://localhost:8080"
+
+  filmpin.dyastin.dev:
+    target: "http://localhost:5175"
+    rate_limit:
+      rate: 0
+      burst: 0
+      cooldown: 0
+    routes:
+      - pattern: "/"
+        target: "http://localhost:5175"
+      
+      - pattern: "/api"
+        target: "http://localhost:3030"
+      
+      - pattern: "/socket.io"
+        target: "http://localhost:3030"
+
+  mrps.dyastin.dev:
+    target: "http://localhost:5174"
+    rate_limit:
+      rate: 0
+      burst: 0
+      cooldown: 0
+    routes:
+      - pattern: "/"
+        target: "http://localhost:5174"
+      
+      - pattern: "/api"
+        target: "http://localhost:6060"
+        rewrite:
+          from: "^/api/(.*)$"
+          to: "/$1"
+
+  wormhole.dyastin.dev:
+    target: "localhost:8888"
+    rate_limit:
+      rate: 0
+      burst: 0
+      cooldown: 0
+    routes:
+      - pattern: "/"
+        target: "localhost:8888"
