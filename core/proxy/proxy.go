@@ -88,11 +88,7 @@ func (p *Proxy) http(conn net.Conn) error {
 		return ErrNotConfigured
 	}
 
-	if proxy.Limiter == nil {
-		return nil
-	}
-
-	if !proxy.Limiter.Allow(conn) {
+	if proxy.Limiter != nil && !proxy.Limiter.Allow(conn) {
 		return nil
 	}
 
@@ -132,11 +128,7 @@ func (p *Proxy) tls(conn *tls.Conn) error {
 	sni := conn.ConnectionState().ServerName
 	proxy := p.Config.GetProxy(sni)
 
-	if proxy.Limiter == nil {
-		return nil
-	}
-
-	if !proxy.Limiter.Allow(conn) {
+	if proxy.Limiter != nil && !proxy.Limiter.Allow(conn) {
 		return nil
 	}
 
