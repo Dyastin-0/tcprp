@@ -102,7 +102,10 @@ func startAction(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	ln, err := tls.Listen("tcp", addr, magic.TLSConfig())
+	tlsConfig := magic.TLSConfig()
+	tlsConfig.NextProtos = []string{"h2", "http/1.1"}
+
+	ln, err := tls.Listen("tcp", addr, tlsConfig)
 	if err != nil {
 		return err
 	}
