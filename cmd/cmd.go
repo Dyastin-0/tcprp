@@ -103,7 +103,7 @@ func startAction(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	tlsConfig := magic.TLSConfig()
-	tlsConfig.NextProtos = []string{"h2", "http/1.1"}
+	tlsConfig.NextProtos = []string{"http/1.1", "h2"}
 
 	ln, err := tls.Listen("tcp", addr, tlsConfig)
 	if err != nil {
