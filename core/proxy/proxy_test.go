@@ -69,7 +69,7 @@ func generateTestCert() (tls.Certificate, error) {
 }
 
 func TestHTTP(t *testing.T) {
-	proxy := NewProxy(nil)
+	proxy := New()
 
 	config := `
 proxies:
@@ -77,7 +77,7 @@ proxies:
     target: "localhost:8082"
 `
 
-	proxy.config.LoadBytes([]byte(config))
+	proxy.Config.LoadBytes([]byte(config))
 
 	server := NewTestHTTPServer(":8082", "hello")
 	go server.ListenAndServe()
@@ -126,7 +126,8 @@ func TestHTTPS(t *testing.T) {
 		NextProtos: []string{"http/1.1", "h2"},
 	}
 
-	proxy := NewProxy(tlsConfig)
+	proxy := New()
+	proxy.TLSConfig = tlsConfig
 
 	config := `
 proxies:
@@ -134,7 +135,7 @@ proxies:
     target: "localhost:8084"
 `
 
-	proxy.config.LoadBytes([]byte(config))
+	proxy.Config.LoadBytes([]byte(config))
 
 	server := NewTestHTTPServer(":8084", "hello")
 	go server.ListenAndServe()
@@ -189,7 +190,9 @@ func TestTLS(t *testing.T) {
 		},
 	}
 
-	proxy := NewProxy(tlsConfig)
+	proxy := New()
+
+	proxy.TLSConfig = tlsConfig
 
 	config := `
 proxies:
@@ -197,7 +200,7 @@ proxies:
     target: "localhost:8086"
 `
 
-	proxy.config.LoadBytes([]byte(config))
+	proxy.Config.LoadBytes([]byte(config))
 
 	serverLn, err := NewTestTCPServer(":8086")
 	require.NoError(t, err)
