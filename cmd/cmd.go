@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
@@ -105,7 +104,9 @@ func startAction(ctx context.Context, cmd *cli.Command) error {
 	tlsConfig := magic.TLSConfig()
 	tlsConfig.NextProtos = []string{"http/1.1", "h2"}
 
-	ln, err := tls.Listen("tcp", addr, tlsConfig)
+	proxy.TLSConfig = tlsConfig
+
+	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
 	}
