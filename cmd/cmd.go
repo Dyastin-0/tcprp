@@ -11,6 +11,7 @@ import (
 	"github.com/Dyastin-0/mpr/core/proxy"
 	"github.com/caddyserver/certmagic"
 	"github.com/common-nighthawk/go-figure"
+	"github.com/libdns/cloudflare"
 	"github.com/urfave/cli/v3"
 )
 
@@ -50,6 +51,14 @@ func startCommand() *cli.Command {
 				Required: true,
 			},
 			&cli.StringFlag{
+				Name:     "api",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:     "email",
+				Required: true,
+			},
+			&cli.StringFlag{
 				Name:    "addr",
 				Aliases: []string{"a"},
 				Value:   ":443",
@@ -61,6 +70,8 @@ func startCommand() *cli.Command {
 
 func startAction(ctx context.Context, cmd *cli.Command) error {
 	configPath := cmd.String("config")
+	api := cmd.String("api")
+	email := cmd.String("email")
 	addr := cmd.String("addr")
 
 	proxy := proxy.New()
@@ -69,9 +80,27 @@ func startAction(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
+	provider := &cloudflare.Provider{
+		APIToken: api,
+	}
+
+	certmagic.DefaultACME.Email = email
+	certmagic.DefaultACME.Agreed = true
+	certmagic.DefaultACME.DisableHTTPChallenge = true
+	certmagic.DefaultACME.CA = certmagic.LetsEncryptProductionCA
+	certmagic.DefaultACME.DNS01Solver = &certmagic.DNS01Solver{
+		DNSManager: certmagic.DNSManager{
+			DNSProvider: provider,
+		},
+	}
+
 	domains := proxy.Config.Proxies.GetKeysWithVal()
+
 	magic := certmagic.NewDefault()
-	magic.ManageAsync(ctx, domains)
+	err = magic.ManageAsync(ctx, domains)
+	if err != nil {
+		return err
+	}
 
 	ln, err := tls.Listen("tcp", addr, magic.TLSConfig())
 	if err != nil {
