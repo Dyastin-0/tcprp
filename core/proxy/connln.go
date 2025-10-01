@@ -8,7 +8,6 @@ import (
 
 type connListener struct {
 	conn   net.Conn
-	once   sync.Once
 	served bool
 	mu     sync.Mutex
 }

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strings"
 
 	"github.com/Dyastin-0/tcprp/core/config"
 	"github.com/rs/zerolog/log"
@@ -80,12 +81,10 @@ func (p *Proxy) http(conn net.Conn) error {
 			http.Error(w, "Host not found", http.StatusNotFound)
 			return
 		}
-
 		if proxy.Limiter != nil && !proxy.Limiter.Allow(conn) {
 			http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
 			return
 		}
-
 		route := proxy.MatchRoute(req.URL.Path)
 		log.Debug().
 			Str("host", host).
@@ -98,20 +97,19 @@ func (p *Proxy) http(conn net.Conn) error {
 			req.URL.RawPath = route.RewrittenPath
 		}
 
-		targetURL, err := url.Parse(route.Target)
+		target := route.Target
+		if !strings.HasPrefix(target, "http://") {
+			target = fmt.Sprintf("http://%s", target)
+		}
+
+		targetURL, err := url.Parse(target)
 		if err != nil {
-			targetURL = &url.URL{
-				Scheme: "http",
-				Host:   route.Target,
-			}
+			return
 		}
 
 		reverseProxy := &httputil.ReverseProxy{
 			Director: func(req *http.Request) {
 				req.URL.Scheme = targetURL.Scheme
-				if req.URL.Scheme == "" {
-					req.URL.Scheme = "http"
-				}
 				req.URL.Host = targetURL.Host
 				req.Host = targetURL.Host
 			},
@@ -128,7 +126,8 @@ func (p *Proxy) http(conn net.Conn) error {
 		Handler: handler,
 	}
 
-	return server.Serve(&connListener{conn: conn})
+	listener := &connListener{conn: conn}
+	return server.Serve(listener)
 }
 
 func (p *Proxy) tcp(conn net.Conn) error {
