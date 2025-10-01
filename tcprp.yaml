@@ -4,6 +4,7 @@ proxies:
 
   '*.wormhole.dyastin.dev':
     target: "localhost:8889"
+    tls: true
 
   echos.dyastin.dev:
     target: "localhost:42020"
@@ -22,3 +23,4 @@ proxies:
 
   wormhole.dyastin.dev:
     target: "localhost:8888"
+    tls: true
