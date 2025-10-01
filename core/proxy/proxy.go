@@ -103,15 +103,17 @@ func (p *Proxy) http(conn net.Conn) error {
 			Str("target", route.Target).
 			Msg("rewrite")
 
-		shouldClose := p.handleSingleRequest(conn, req, &route, proxy)
-
+		shouldClose := p.handleSingleRequest(conn, req, route, proxy)
 		if shouldClose {
 			return nil
 		}
 	}
 }
 
-func (p *Proxy) handleSingleRequest(clientConn net.Conn, req *http.Request, route *config.RouteResult, proxy *config.Proxy) bool {
+func (p *Proxy) handleSingleRequest(clientConn net.Conn, req *http.Request, route config.RouteResult, proxy *config.Proxy) bool {
+	isWebSocket := strings.EqualFold(req.Header.Get("Upgrade"), "websocket") &&
+		strings.Contains(strings.ToLower(req.Header.Get("Connection")), "upgrade")
+
 	modifiedReq := req.Clone(req.Context())
 	modifiedReq.URL.Path = route.RewrittenPath
 	if req.URL.RawPath != "" {
@@ -130,6 +132,35 @@ func (p *Proxy) handleSingleRequest(clientConn net.Conn, req *http.Request, rout
 	if err != nil {
 		log.Error().Err(err).Msg("failed to write request to backend")
 		p.writeErrorResponse(clientConn, http.StatusBadGateway, "Bad Gateway")
+		return true
+	}
+
+	if isWebSocket {
+		backendReader := bufio.NewReader(dst)
+		resp, er := http.ReadResponse(backendReader, modifiedReq)
+		if er != nil {
+			log.Error().Err(err).Msg("failed to read upgrade response from backend")
+			p.writeErrorResponse(clientConn, http.StatusBadGateway, "Bad Gateway")
+			return true
+		}
+
+		err = resp.Write(clientConn)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to write upgrade response to client")
+			return true
+		}
+
+		if resp.StatusCode == http.StatusSwitchingProtocols {
+			log.Debug().Str("host", req.Host).Str("path", req.URL.Path).Msg("websocket upgrade successful")
+
+			var trackedConn io.ReadWriter = clientConn
+			if proxy.Metrics != nil {
+				trackedConn = proxy.Metrics.NewProxyReadWriter(clientConn)
+			}
+
+			Stream(trackedConn, dst)
+		}
+
 		return true
 	}
 
