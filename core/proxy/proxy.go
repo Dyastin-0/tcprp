@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"crypto/tls"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
+	"strings"
 
 	"github.com/Dyastin-0/tcprp/core/config"
 	"github.com/rs/zerolog/log"
@@ -71,34 +73,47 @@ func (p *Proxy) handleTLS(conn net.Conn) (string, *tls.Conn) {
 
 func (p *Proxy) http(conn net.Conn) error {
 	defer conn.Close()
-
 	bufrd := bufio.NewReader(conn)
-	req, err := http.ReadRequest(bufrd)
-	if err != nil {
-		return err
+
+	for {
+		req, err := http.ReadRequest(bufrd)
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+
+		host := req.Host
+		proxy := p.Config.GetProxy(host)
+		if proxy == nil {
+			return nil
+		}
+
+		if proxy.Limiter != nil && !proxy.Limiter.Allow(conn) {
+			return nil
+		}
+
+		route := proxy.MatchRoute(req.URL.Path)
+		log.Debug().
+			Str("host", host).
+			Str("path", route.RewrittenPath).
+			Str("target", route.Target).
+			Msg("rewrite")
+
+		if err := p.handleSingleRequest(req, &route, conn, proxy); err != nil {
+			return err
+		}
+
+		if !shouldKeepAlive(req) {
+			return nil
+		}
 	}
+}
 
-	host := req.Host
-	proxy := p.Config.GetProxy(host)
-	if proxy == nil {
-		return nil
-	}
-
-	if proxy.Limiter != nil && !proxy.Limiter.Allow(conn) {
-		return nil
-	}
-
-	route := proxy.MatchRoute(req.URL.Path)
-
-	log.Debug().
-		Str("host", host).
-		Str("path", route.RewrittenPath).
-		Str("tartget", route.Target).
-		Msg("rewrite")
-
+func (p *Proxy) handleSingleRequest(req *http.Request, route *config.RouteResult, clientConn net.Conn, proxy *config.Proxy) error {
 	modifiedReq := req.Clone(req.Context())
 	modifiedReq.URL.Path = route.RewrittenPath
-
 	if req.URL.RawPath != "" {
 		modifiedReq.URL.RawPath = route.RewrittenPath
 	}
@@ -114,9 +129,34 @@ func (p *Proxy) http(conn net.Conn) error {
 		return fmt.Errorf("failed to write http request: %w", err)
 	}
 
-	proxyConn := proxy.Metrics.NewProxyReadWriter(conn)
+	bufBackend := bufio.NewReader(dst)
+	resp, err := http.ReadResponse(bufBackend, modifiedReq)
+	if err != nil {
+		return fmt.Errorf("failed to read http response: %w", err)
+	}
+	defer resp.Body.Close()
 
-	return Stream(proxyConn, dst)
+	var responseWriter io.Writer = clientConn
+	if proxy.Metrics != nil {
+		metricsConn := proxy.Metrics.NewProxyReadWriter(clientConn)
+		responseWriter = metricsConn
+	}
+
+	err = resp.Write(responseWriter)
+	if err != nil {
+		return fmt.Errorf("failed to write http response: %w", err)
+	}
+
+	return nil
+}
+
+func shouldKeepAlive(req *http.Request) bool {
+	// HTTP/1.0 defaults to close unless explicitly keep-alive
+	if req.ProtoMajor == 1 && req.ProtoMinor == 0 {
+		return strings.ToLower(req.Header.Get("Connection")) == "keep-alive"
+	}
+	// HTTP/1.1 defaults to keep-alive unless explicitly close
+	return strings.ToLower(req.Header.Get("Connection")) != "close"
 }
 
 func (p *Proxy) tcp(conn net.Conn) error {
