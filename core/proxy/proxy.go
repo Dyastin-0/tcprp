@@ -3,7 +3,6 @@ package proxy
 import (
 	"bufio"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -11,13 +10,9 @@ import (
 	"github.com/Dyastin-0/tcprp/core/config"
 )
 
-var (
-	ErrNotConfigured = errors.New("not configured")
-
-	sniff = Sniff{
-		peekN: 24,
-	}
-)
+var sniff = Sniff{
+	peekN: 24,
+}
 
 // Proxy handles protocol detection and routing.
 type Proxy struct {
@@ -27,7 +22,7 @@ type Proxy struct {
 	TLSConfig *tls.Config
 }
 
-// NewProxy return a new Proxy.
+// New return a new Proxy.
 func New() *Proxy {
 	return &Proxy{
 		Config: config.NewConfig(),
@@ -85,7 +80,7 @@ func (p *Proxy) http(conn net.Conn) error {
 	host := req.Host
 	proxy := p.Config.GetProxy(host)
 	if proxy == nil {
-		return ErrNotConfigured
+		return nil
 	}
 
 	if proxy.Limiter != nil && !proxy.Limiter.Allow(conn) {
@@ -127,6 +122,9 @@ func (p *Proxy) tls(conn *tls.Conn) error {
 
 	sni := conn.ConnectionState().ServerName
 	proxy := p.Config.GetProxy(sni)
+	if proxy == nil {
+		return nil
+	}
 
 	if proxy.Limiter != nil && !proxy.Limiter.Allow(conn) {
 		return nil
