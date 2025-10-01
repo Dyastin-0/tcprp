@@ -89,12 +89,14 @@ func (p *Proxy) http(conn net.Conn) error {
 	}
 
 	route := proxy.MatchRoute(req.URL.Path)
+
 	log.Debug().
+		Str("host", host).
 		Str("path", route.RewrittenPath).
 		Str("tartget", route.Target).
 		Msg("rewrite")
-	modifiedReq := req.Clone(req.Context())
 
+	modifiedReq := req.Clone(req.Context())
 	modifiedReq.URL.Path = route.RewrittenPath
 
 	if req.URL.RawPath != "" {
