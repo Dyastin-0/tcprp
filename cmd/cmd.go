@@ -1,3 +1,4 @@
+// Package cmd implements a command line interface for tcprp.
 package cmd
 
 import (
@@ -6,8 +7,8 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/Dyastin-0/mpr/core"
-	"github.com/Dyastin-0/mpr/core/proxy"
+	"github.com/Dyastin-0/tcprp/core"
+	"github.com/Dyastin-0/tcprp/core/proxy"
 	"github.com/caddyserver/certmagic"
 	"github.com/common-nighthawk/go-figure"
 	"github.com/libdns/cloudflare"
@@ -16,8 +17,8 @@ import (
 
 func New() *cli.Command {
 	return &cli.Command{
-		Name:    "mpr",
-		Usage:   "a reverse proxy service",
+		Name:    "tcprp",
+		Usage:   "a tcp reverse proxy server",
 		Version: core.VERSION,
 		Commands: []*cli.Command{
 			startCommand(),
@@ -27,7 +28,7 @@ func New() *cli.Command {
 }
 
 func rpAction(ctx context.Context, cmd *cli.Command) error {
-	figure := figure.NewFigure("mpr-cli", "", true)
+	figure := figure.NewFigure("tcprp-cli", "", true)
 	figure.Print()
 	fmt.Println()
 
@@ -42,7 +43,7 @@ func rpAction(ctx context.Context, cmd *cli.Command) error {
 func startCommand() *cli.Command {
 	return &cli.Command{
 		Name:        "start",
-		Description: "start the reverse proxy service",
+		Description: "start the reverse proxy server",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:     "config",

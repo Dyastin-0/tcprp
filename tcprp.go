@@ -4,7 +4,7 @@ import (
 	"context"
 	"os"
 
-	"github.com/Dyastin-0/mpr/cmd"
+	"github.com/Dyastin-0/tcprp/cmd"
 )
 
 func main() {
