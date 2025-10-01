@@ -17,9 +17,10 @@ type RewriteRule struct {
 
 // Route represents an HTTP route pattern, its target, and optional rewrite rules.
 type Route struct {
-	Pattern     string       `yaml:"pattern"`
-	Target      string       `yaml:"target"`
-	RewriteRule *RewriteRule `yaml:"rewrite,omitempty"`
+	Pattern     string
+	Target      string
+	TLS         bool
+	RewriteRule *RewriteRule
 	Limiter     *limiter.Limiter
 	regex       *regexp.Regexp
 }
@@ -28,6 +29,7 @@ type Route struct {
 type RouteResult struct {
 	Target        string
 	RewrittenPath string
+	TLS           bool
 	Matched       bool
 	limiter       *limiter.Limiter
 }
@@ -35,6 +37,7 @@ type RouteResult struct {
 // Proxy represents a proxy configuration for a domain.
 type Proxy struct {
 	Target       string
+	TLS          bool
 	Metrics      *metrics.Metrics
 	Routes       []*Route
 	Limiter      *limiter.Limiter
@@ -74,6 +77,7 @@ func (p *Proxy) MatchRoute(path string) RouteResult {
 		if matchesRoute(path, route.Pattern) {
 			result := RouteResult{
 				Target:        route.Target,
+				TLS:           route.TLS,
 				RewrittenPath: path,
 				limiter:       route.Limiter,
 				Matched:       true,
@@ -89,6 +93,7 @@ func (p *Proxy) MatchRoute(path string) RouteResult {
 
 	return RouteResult{
 		Target:        p.Target,
+		TLS:           p.TLS,
 		RewrittenPath: path,
 		limiter:       p.Limiter,
 		Matched:       false,

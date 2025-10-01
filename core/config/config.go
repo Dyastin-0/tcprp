@@ -28,12 +28,14 @@ type LimiterConfig struct {
 type RouteConfig struct {
 	Pattern     string         `yaml:"pattern"`
 	Target      string         `yaml:"target"`
+	TLS         bool           `yaml:"tls,omitempty"`
 	RewriteRule *RewriteRule   `yaml:"rewrite,omitempty"`
 	Limiter     *LimiterConfig `yaml:"rate_limit,omitempty"`
 }
 
 type ProxyConfig struct {
 	Target  string         `yaml:"target"`
+	TLS     bool           `yaml:"tls,omitempty"`
 	Routes  []*RouteConfig `yaml:"routes,omitempty"`
 	Limiter *LimiterConfig `yaml:"rate_limit,omitempty"`
 }
@@ -82,6 +84,7 @@ func (c *Config) loadProxies(configFile ConfigFile) error {
 
 		p := &Proxy{
 			Target:  proxy.Target,
+			TLS:     proxy.TLS,
 			Metrics: metrics.New(),
 		}
 
@@ -98,6 +101,7 @@ func (c *Config) loadProxies(configFile ConfigFile) error {
 			for i, routeConf := range proxy.Routes {
 				route := &Route{
 					Target:      routeConf.Target,
+					TLS:         routeConf.TLS,
 					Pattern:     routeConf.Pattern,
 					RewriteRule: routeConf.RewriteRule,
 				}

@@ -10,6 +10,7 @@ func TestConfig(t *testing.T) {
 	configStr := `
 proxies:
   app.com:
+    tls: true
     rate_limit:
       rate: 10
       burst: 10
@@ -41,6 +42,7 @@ proxies:
 	require.NotNil(t, proxy)
 	require.NotNil(t, proxy.Limiter)
 	require.Equal(t, "localhost:8080", proxy.Target)
+	require.True(t, proxy.TLS)
 
 	route := proxy.MatchRoute("/v1/api")
 	require.Equal(t, "/", route.RewrittenPath)

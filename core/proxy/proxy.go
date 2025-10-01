@@ -120,13 +120,28 @@ func (p *Proxy) handleSingleRequest(clientConn net.Conn, req *http.Request, rout
 		modifiedReq.URL.RawPath = route.RewrittenPath
 	}
 
-	dst, err := net.Dial("tcp", route.Target)
-	if err != nil {
-		log.Error().Err(err).Str("target", route.Target).Msg("failed to dial backend")
-		p.writeErrorResponse(clientConn, http.StatusBadGateway, "Bad Gateway")
-		return true
+	var dst net.Conn
+	var err error
+	if proxy.TLS {
+		tlsConfig := &tls.Config{
+			ServerName: req.Host,
+		}
+		dst, err = tls.Dial("tcp", route.Target, tlsConfig)
+		if err != nil {
+			log.Error().Err(err).Str("target", route.Target).Msg("failed to dial tls backend")
+			p.writeErrorResponse(clientConn, http.StatusBadGateway, "Bad Gateway")
+			return true
+		}
+		defer dst.Close()
+	} else {
+		dst, err = net.Dial("tcp", route.Target)
+		if err != nil {
+			log.Error().Err(err).Str("target", route.Target).Msg("failed to dial tcp backend")
+			p.writeErrorResponse(clientConn, http.StatusBadGateway, "Bad Gateway")
+			return true
+		}
+		defer dst.Close()
 	}
-	defer dst.Close()
 
 	err = modifiedReq.Write(dst)
 	if err != nil {
@@ -228,12 +243,27 @@ func (p *Proxy) tls(conn *tls.Conn) error {
 		return nil
 	}
 
-	dst, err := net.Dial("tcp", proxy.Target)
-	if err != nil {
-		return fmt.Errorf("failed to dial tcp: %w", err)
+	var dst net.Conn
+	var err error
+	if proxy.TLS {
+		tlsConfig := &tls.Config{
+			ServerName: sni,
+		}
+		dst, err = tls.Dial("tcp", proxy.Target, tlsConfig)
+		if err != nil {
+			return fmt.Errorf("failed to dial tls: %w", err)
+		}
+	} else {
+		dst, err = net.Dial("tcp", proxy.Target)
+		if err != nil {
+			return fmt.Errorf("failed to dial tcp: %w", err)
+		}
 	}
 
-	proxyConn := proxy.Metrics.NewProxyReadWriter(conn)
+	var readWriter io.ReadWriter = conn
+	if proxy.Metrics != nil {
+		readWriter = proxy.Metrics.NewProxyReadWriter(conn)
+	}
 
-	return Stream(proxyConn, dst)
+	return Stream(readWriter, dst)
 }
