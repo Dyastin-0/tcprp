@@ -131,8 +131,11 @@ func TestHTTPS(t *testing.T) {
 
 	config := `
 proxies:
-  "app.com":
-    target: "localhost:8084"
+  app.com:
+    target: "localhost:0"
+    routes:
+      - pattern: "/api/*"
+        target: "localhost:8084"
 `
 
 	proxy.Config.LoadBytes([]byte(config))
@@ -164,7 +167,7 @@ proxies:
 	require.NoError(t, err)
 	defer conn.Close()
 
-	httpRequest := "GET / HTTP/1.1\r\nHost: app.com\r\n\r\n"
+	httpRequest := "GET /api/test HTTP/1.1\r\nHost: app.com\r\n\r\n"
 	_, err = conn.Write([]byte(httpRequest))
 	require.NoError(t, err)
 

@@ -1,12 +1,12 @@
 package proxy
 
 import (
+	"bufio"
 	"crypto/tls"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
-	"net/http/httputil"
-	"net/url"
 	"strings"
 
 	"github.com/Dyastin-0/tcprp/core/config"
@@ -73,18 +73,29 @@ func (p *Proxy) handleTLS(conn net.Conn) (string, *tls.Conn) {
 
 func (p *Proxy) http(conn net.Conn) error {
 	defer conn.Close()
+	bufrd := bufio.NewReader(conn)
 
-	handler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	for {
+		req, err := http.ReadRequest(bufrd)
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+
 		host := req.Host
 		proxy := p.Config.GetProxy(host)
 		if proxy == nil {
-			http.Error(w, "Host not found", http.StatusNotFound)
-			return
+			p.writeErrorResponse(conn, http.StatusNotFound, "Host not found")
+			return nil
 		}
+
 		if proxy.Limiter != nil && !proxy.Limiter.Allow(conn) {
-			http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
-			return
+			p.writeErrorResponse(conn, http.StatusTooManyRequests, "Rate limit exceeded")
+			return nil
 		}
+
 		route := proxy.MatchRoute(req.URL.Path)
 		log.Debug().
 			Str("host", host).
@@ -92,42 +103,80 @@ func (p *Proxy) http(conn net.Conn) error {
 			Str("target", route.Target).
 			Msg("rewrite")
 
-		req.URL.Path = route.RewrittenPath
-		if req.URL.RawPath != "" {
-			req.URL.RawPath = route.RewrittenPath
+		shouldClose := p.handleSingleRequest(conn, req, &route, proxy)
+
+		if shouldClose {
+			return nil
 		}
+	}
+}
 
-		target := route.Target
-		if !strings.HasPrefix(target, "http://") {
-			target = fmt.Sprintf("http://%s", target)
-		}
-
-		targetURL, err := url.Parse(target)
-		if err != nil {
-			return
-		}
-
-		reverseProxy := &httputil.ReverseProxy{
-			Director: func(req *http.Request) {
-				req.URL.Scheme = targetURL.Scheme
-				req.URL.Host = targetURL.Host
-				req.Host = targetURL.Host
-			},
-			ErrorHandler: func(w http.ResponseWriter, req *http.Request, err error) {
-				log.Error().Err(err).Str("target", route.Target).Msg("proxy error")
-				http.Error(w, "Bad Gateway", http.StatusBadGateway)
-			},
-		}
-
-		reverseProxy.ServeHTTP(w, req)
-	})
-
-	server := &http.Server{
-		Handler: handler,
+func (p *Proxy) handleSingleRequest(clientConn net.Conn, req *http.Request, route *config.RouteResult, proxy *config.Proxy) bool {
+	modifiedReq := req.Clone(req.Context())
+	modifiedReq.URL.Path = route.RewrittenPath
+	if req.URL.RawPath != "" {
+		modifiedReq.URL.RawPath = route.RewrittenPath
 	}
 
-	listener := &connListener{conn: conn}
-	return server.Serve(listener)
+	dst, err := net.Dial("tcp", route.Target)
+	if err != nil {
+		log.Error().Err(err).Str("target", route.Target).Msg("failed to dial backend")
+		p.writeErrorResponse(clientConn, http.StatusBadGateway, "Bad Gateway")
+		return true
+	}
+	defer dst.Close()
+
+	err = modifiedReq.Write(dst)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to write request to backend")
+		p.writeErrorResponse(clientConn, http.StatusBadGateway, "Bad Gateway")
+		return true
+	}
+
+	backendReader := bufio.NewReader(dst)
+	resp, err := http.ReadResponse(backendReader, modifiedReq)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to read response from backend")
+		p.writeErrorResponse(clientConn, http.StatusBadGateway, "Bad Gateway")
+		return true
+	}
+	defer resp.Body.Close()
+
+	var writer io.Writer = clientConn
+	if proxy.Metrics != nil {
+		metricsWriter := proxy.Metrics.NewProxyReadWriter(clientConn)
+		writer = metricsWriter
+	}
+
+	err = resp.Write(writer)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to write response to client")
+		return true
+	}
+
+	shouldClose := false
+	if req.ProtoMajor == 1 && req.ProtoMinor == 0 {
+		shouldClose = !strings.EqualFold(req.Header.Get("Connection"), "keep-alive")
+	} else {
+		shouldClose = strings.EqualFold(req.Header.Get("Connection"), "close") ||
+			strings.EqualFold(resp.Header.Get("Connection"), "close")
+	}
+
+	return shouldClose
+}
+
+func (p *Proxy) writeErrorResponse(conn net.Conn, statusCode int, message string) {
+	resp := &http.Response{
+		StatusCode: statusCode,
+		ProtoMajor: 1,
+		ProtoMinor: 1,
+		Header:     make(http.Header),
+		Body:       io.NopCloser(strings.NewReader(message)),
+	}
+	resp.Header.Set("Content-Type", "text/plain")
+	resp.Header.Set("Content-Length", fmt.Sprintf("%d", len(message)))
+	resp.Header.Set("Connection", "close")
+	resp.Write(conn)
 }
 
 func (p *Proxy) tcp(conn net.Conn) error {

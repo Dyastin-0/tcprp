@@ -4,37 +4,18 @@ proxies:
 
   '*.wormhole.dyastin.dev':
     target: "localhost:8889"
-    rate_limit:
-      rate: 0
-      burst: 0
-      cooldown: 0
 
   echos.dyastin.dev:
     target: "localhost:42020"
-    rate_limit:
-      rate: 0
-      burst: 0
-      cooldown: 0
     routes:
-      - pattern: "/api"
+      - pattern: "/api/*"
         target: "localhost:8080"
 
   filmpin.dyastin.dev:
     target: "localhost:5175"
-    rate_limit:
-      rate: 0
-      burst: 0
-      cooldown: 0
     routes:
-      - pattern: "/api"
-        target: "localhost:3030"
-      
       - pattern: "/socket.io"
         target: "localhost:3030"
 
   wormhole.dyastin.dev:
     target: "localhost:8888"
-    rate_limit:
-      rate: 0
-      burst: 0
-      cooldown: 0
