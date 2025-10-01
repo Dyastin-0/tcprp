@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/Dyastin-0/tcprp/core/config"
+	"github.com/rs/zerolog/log"
 )
 
 var sniff = Sniff{
@@ -88,6 +89,10 @@ func (p *Proxy) http(conn net.Conn) error {
 	}
 
 	route := proxy.MatchRoute(req.URL.Path)
+	log.Debug().
+		Str("path", route.RewrittenPath).
+		Str("tartget", route.Target).
+		Msg("rewrite")
 	modifiedReq := req.Clone(req.Context())
 
 	modifiedReq.URL.Path = route.RewrittenPath

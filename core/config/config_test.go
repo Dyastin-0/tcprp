@@ -18,9 +18,6 @@ proxies:
     routes:
       - pattern: "/api/*"
         target: "localhost:3000"
-        rewrite:
-          from: "^/api"
-          to: ""
      
       - pattern: "/v1/*"
         target: "localhost:8001"
@@ -48,8 +45,9 @@ proxies:
 	route := proxy.MatchRoute("/v1/api")
 	require.Equal(t, "/", route.RewrittenPath)
 
-	route = proxy.MatchRoute("/api")
-	require.Equal(t, "", route.RewrittenPath)
+	route = proxy.MatchRoute("/api/create")
+	require.Equal(t, "/api/create", route.RewrittenPath)
+	require.Equal(t, "localhost:3000", route.Target)
 
 	route = proxy.MatchRoute("/health")
 	require.Equal(t, "/health", route.RewrittenPath)
