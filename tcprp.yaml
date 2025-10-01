@@ -23,4 +23,3 @@ proxies:
 
   wormhole.dyastin.dev:
     target: "localhost:8888"
-    tls: true
