@@ -14,6 +14,9 @@ proxies:
   filmpin.dyastin.dev:
     target: "localhost:5175"
     routes:
+      - pattern: "/api/*"
+        target: "localhost:3030"
+      
       - pattern: "/socket.io"
         target: "localhost:3030"
 
