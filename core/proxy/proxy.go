@@ -8,7 +8,7 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/Dyastin-0/mpr/core/config"
+	"github.com/Dyastin-0/tcprp/core/config"
 )
 
 var (

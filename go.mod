@@ -1,4 +1,4 @@
-module github.com/Dyastin-0/mpr
+module github.com/Dyastin-0/tcprp
 
 go 1.25.1
 

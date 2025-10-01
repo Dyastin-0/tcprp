@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/Dyastin-0/mpr/core/limiter"
-	"github.com/Dyastin-0/mpr/core/metrics"
+	"github.com/Dyastin-0/tcprp/core/limiter"
+	"github.com/Dyastin-0/tcprp/core/metrics"
 )
 
 // RewriteRule represents a URL path rewriting rule.
