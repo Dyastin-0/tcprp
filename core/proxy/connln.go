@@ -7,19 +7,22 @@ import (
 )
 
 type connListener struct {
-	conn net.Conn
-	once sync.Once
+	conn   net.Conn
+	once   sync.Once
+	served bool
+	mu     sync.Mutex
 }
 
 func (l *connListener) Accept() (net.Conn, error) {
-	var c net.Conn
-	l.once.Do(func() {
-		c = l.conn
-	})
-	if c != nil {
-		return c, nil
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if l.served {
+		return nil, io.EOF
 	}
-	return nil, io.EOF
+
+	l.served = true
+	return l.conn, nil
 }
 
 func (l *connListener) Close() error {
