@@ -19,16 +19,12 @@ func Stream(src, dst io.ReadWriter) error {
 
 	// Copy src -> dst
 	wg.Go(func() {
-		if copyErr := CopyWithContext(ctx, dst, src); copyErr != nil {
-			errch <- copyErr
-		}
+		errch <- CopyWithContext(ctx, dst, src)
 	})
 
 	// Copy dst -> src
 	wg.Go(func() {
-		if copyErr := CopyWithContext(ctx, src, dst); copyErr != nil {
-			errch <- copyErr
-		}
+		errch <- CopyWithContext(ctx, src, dst)
 	})
 
 	wg.Wait()
@@ -49,16 +45,12 @@ func StreamWithContext(ctx context.Context, src, dst io.ReadWriter) error {
 
 	// Copy src -> dst
 	wg.Go(func() {
-		if copyErr := CopyWithContext(localCtx, dst, src); copyErr != nil {
-			errch <- copyErr
-		}
+		errch <- CopyWithContext(localCtx, dst, src)
 	})
 
 	// Copy dst -> src
 	wg.Go(func() {
-		if copyErr := CopyWithContext(localCtx, src, dst); copyErr != nil {
-			errch <- copyErr
-		}
+		errch <- CopyWithContext(localCtx, src, dst)
 	})
 
 	done := make(chan struct{})
@@ -81,7 +73,7 @@ func StreamWithContext(ctx context.Context, src, dst io.ReadWriter) error {
 	return <-errch
 }
 
-// copyWithContext performs io.Copy with context cancellation.
+// CopyWithContext performs io.Copy with context cancellation.
 func CopyWithContext(ctx context.Context, dst, src io.ReadWriter) error {
 	buf := make([]byte, 32*1024)
 
@@ -132,9 +124,6 @@ func CopyWithContext(ctx context.Context, dst, src io.ReadWriter) error {
 				}
 			}
 
-			if readErr == io.EOF {
-				return nil
-			}
 			return readErr
 		}
 	}
