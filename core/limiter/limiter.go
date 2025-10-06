@@ -95,7 +95,7 @@ func (l *Limiter) allow(ip string) bool {
 	}
 
 	if !c.limiter.Allow() {
-		atomic.AddInt64(&c.cooldown, now.Add(l.cooldown).UnixNano())
+		atomic.StoreInt64(&c.cooldown, now.Add(l.cooldown).UnixNano())
 		return false
 	}
 
