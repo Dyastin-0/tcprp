@@ -92,7 +92,7 @@ func (c *Config) loadProxies(configFile ConfigFile) error {
 			p.Limiter = limiter.New(
 				limiter.WithBurst(proxy.Limiter.Burst),
 				limiter.WithRPS(proxy.Limiter.Rate),
-				limiter.WithCooldown(time.Duration(proxy.Limiter.Cooldown)),
+				limiter.WithCooldown(time.Duration(proxy.Limiter.Cooldown)*time.Millisecond),
 			)
 		}
 
