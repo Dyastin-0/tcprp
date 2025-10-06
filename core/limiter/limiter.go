@@ -3,7 +3,6 @@ package limiter
 
 import (
 	"net"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -21,7 +20,6 @@ type Limiter struct {
 }
 
 type client struct {
-	mu       sync.RWMutex
 	limiter  *rate.Limiter
 	lastSeen int64
 	cooldown int64
@@ -79,18 +77,20 @@ func (l *Limiter) AllowIP(ip string) bool {
 
 func (l *Limiter) allow(ip string) bool {
 	now := time.Now()
+	nowNano := now.UnixNano()
+
 	c, exists := l.clients.Get(ip)
-
 	if !exists {
-
 		c = &client{
 			limiter:  rate.NewLimiter(l.rate, l.burst),
-			lastSeen: now.UnixNano(),
+			lastSeen: nowNano,
+			cooldown: 0,
 		}
 		l.clients.Set(ip, c)
 	}
 
-	if now.Before(time.Unix(0, atomic.LoadInt64(&c.cooldown))) {
+	cooldownUntil := atomic.LoadInt64(&c.cooldown)
+	if cooldownUntil > 0 && nowNano < cooldownUntil {
 		return false
 	}
 
@@ -99,7 +99,7 @@ func (l *Limiter) allow(ip string) bool {
 		return false
 	}
 
-	atomic.StoreInt64(&c.lastSeen, now.UnixNano())
+	atomic.StoreInt64(&c.lastSeen, nowNano)
 	return true
 }
 
