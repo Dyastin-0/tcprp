@@ -42,12 +42,14 @@ type ProxyConfig struct {
 
 // ConfigFile represents the YAML structure.
 type ConfigFile struct {
-	Proxies map[string]ProxyConfig `yaml:"proxies"`
+	Proxies       map[string]ProxyConfig `yaml:"proxies"`
+	GlobalLimiter *LimiterConfig         `yaml:"global_rate_limit,omitempty"`
 }
 
 // Config holds the loaded configuration.
 type Config struct {
-	Proxies *Trie[*Proxy]
+	Proxies       *Trie[*Proxy]
+	GlobalLimiter *limiter.Limiter
 }
 
 // NewConfig creates a new configuration instance.
@@ -77,6 +79,14 @@ func (c *Config) LoadBytes(data []byte) error {
 
 // loadProxies loads proxy configurations into the trie.
 func (c *Config) loadProxies(configFile ConfigFile) error {
+	if configFile.GlobalLimiter != nil {
+		c.GlobalLimiter = limiter.New(
+			limiter.WithBurst(configFile.GlobalLimiter.Burst),
+			limiter.WithRPS(configFile.GlobalLimiter.Rate),
+			limiter.WithCooldown(time.Duration(configFile.GlobalLimiter.Cooldown)*time.Minute),
+		)
+	}
+
 	for domain, proxy := range configFile.Proxies {
 		if proxy.Target == "" {
 			return fmt.Errorf("empty target for domain '%s'", domain)
@@ -92,7 +102,7 @@ func (c *Config) loadProxies(configFile ConfigFile) error {
 			p.Limiter = limiter.New(
 				limiter.WithBurst(proxy.Limiter.Burst),
 				limiter.WithRPS(proxy.Limiter.Rate),
-				limiter.WithCooldown(time.Duration(proxy.Limiter.Cooldown)*time.Millisecond),
+				limiter.WithCooldown(time.Duration(proxy.Limiter.Cooldown)*time.Minute),
 			)
 		}
 
@@ -110,7 +120,7 @@ func (c *Config) loadProxies(configFile ConfigFile) error {
 					route.Limiter = limiter.New(
 						limiter.WithBurst(routeConf.Limiter.Burst),
 						limiter.WithRPS(routeConf.Limiter.Rate),
-						limiter.WithCooldown(time.Duration(routeConf.Limiter.Cooldown)),
+						limiter.WithCooldown(time.Duration(routeConf.Limiter.Cooldown)*time.Minute),
 					)
 				}
 

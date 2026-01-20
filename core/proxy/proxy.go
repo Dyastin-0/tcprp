@@ -34,6 +34,11 @@ func New() *Proxy {
 
 // Handler routes the connection based on the underlying protocol.
 func (p *Proxy) Handler(conn net.Conn) error {
+	if p.Config.GlobalLimiter != nil && !p.Config.GlobalLimiter.Allow(conn) {
+		conn.Close()
+		return fmt.Errorf("global rate limit exceeded")
+	}
+
 	protocol, peekableConn := sniff.Conn(conn)
 
 	switch protocol {
