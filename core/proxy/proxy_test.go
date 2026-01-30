@@ -85,17 +85,14 @@ proxies:
 			go func(c net.Conn) {
 				defer c.Close()
 
-				tlsConn := tls.Server(c, tlsConfig)
-				if er := tlsConn.Handshake(); er != nil {
-					return
-				}
+				c = tls.Server(c, tlsConfig)
 
 				buf := make([]byte, 1024)
-				n, er := tlsConn.Read(buf)
+				n, er := c.Read(buf)
 				if er != nil {
 					return
 				}
-				tlsConn.Write(buf[:n])
+				c.Write(buf[:n])
 			}(conn)
 		}
 	}()
