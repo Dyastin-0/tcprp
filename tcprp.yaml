@@ -5,26 +5,30 @@ global_rate_limit:
 
 proxies:
   filespace.dyastin.dev:
-    proto: "http"
     target: "localhost:3011"
+    terminate: true
+    proto: http
     routes:
       - pattern: "/api/v2/*"
         target: "localhost:3010"
         
   pprof.dyastin.dev:
-    proto: "http"
     target: "localhost:7060"
+    terminate: true
+    proto: http
     
   dyastin.dev:
-    proto: "http"
     target: "localhost:3111"
+    terminate: true
+    proto: http
     routes:
       - pattern: "/api/v1/*"
         target: "localhost:8081"
         
   grafana.dyastin.dev:
-    proto: "http"
     target: "localhost:3000"
+    terminate: true
+    proto: http
     
   '*.wormhole.dyastin.dev':
     target: "localhost:8889"
@@ -35,14 +39,16 @@ proxies:
       
   echos.dyastin.dev:
     target: "localhost:42020"
-    proto: "http"
+    terminate: true
+    proto: http
     routes:
       - pattern: "/api/*"
         target: "localhost:8080"
         
   filmpin.dyastin.dev:
     target: "localhost:5175"
-    proto: "http"
+    terminate: true
+    proto: http
     routes:
       - pattern: "/api/*"
         target: "localhost:3030"
@@ -51,14 +57,16 @@ proxies:
         
   wormhole.dyastin.dev:
     target: "localhost:8881"
+    terminate: true
     rate_limit:
       rate: 5
       burst: 10
       cooldown: 10
       
   atlas.dyastin.dev:
-    proto: "http"
     target: "localhost:8111"
+    terminate: true
+    proto: http
     routes:
       - pattern: "/api/*"
         target: "localhost:8000"
