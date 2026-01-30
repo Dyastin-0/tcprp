@@ -43,9 +43,9 @@ func (p *Proxy) Handler(conn net.Conn) error {
 	}
 
 	if proxy.Terminate {
-		decryptedConn := tls.Server(conn, p.TLSConfig)
+		conn = tls.Server(conn, p.TLSConfig)
 		if proxy.Proto == ProtoHTTP {
-			return p.http(decryptedConn, proxy)
+			return p.http(conn, proxy)
 		}
 	}
 
