@@ -19,7 +19,7 @@ type RewriteRule struct {
 type Route struct {
 	Pattern     string
 	Target      string
-	TLS         bool
+	Terminate   bool
 	RewriteRule *RewriteRule
 	Limiter     *limiter.Limiter
 	regex       *regexp.Regexp
@@ -29,15 +29,17 @@ type Route struct {
 type RouteResult struct {
 	Target        string
 	RewrittenPath string
-	TLS           bool
+	Terminate     bool
 	Matched       bool
-	limiter       *limiter.Limiter
+	Limiter       *limiter.Limiter
 }
 
 // Proxy represents a proxy configuration for a domain.
 type Proxy struct {
 	Target       string
-	TLS          bool
+	Proto        string
+	Terminate    bool
+	WrapTarget   bool
 	Metrics      *metrics.Metrics
 	Routes       []*Route
 	Limiter      *limiter.Limiter
@@ -53,7 +55,6 @@ func (p *Proxy) sortRoutes() {
 		p.sortedRoutes = nil
 		return
 	}
-
 	for i := range p.sortedRoutes {
 		if p.sortedRoutes[i].RewriteRule != nil {
 			regex, err := regexp.Compile(p.sortedRoutes[i].RewriteRule.From)
@@ -62,7 +63,6 @@ func (p *Proxy) sortRoutes() {
 			}
 		}
 	}
-
 	sort.Slice(p.sortedRoutes, func(i, j int) bool {
 		if len(p.sortedRoutes[i].Pattern) != len(p.sortedRoutes[j].Pattern) {
 			return len(p.sortedRoutes[i].Pattern) > len(p.sortedRoutes[j].Pattern)
@@ -77,25 +77,22 @@ func (p *Proxy) MatchRoute(path string) RouteResult {
 		if matchesRoute(path, route.Pattern) {
 			result := RouteResult{
 				Target:        route.Target,
-				TLS:           route.TLS,
+				Terminate:     route.Terminate,
 				RewrittenPath: path,
-				limiter:       route.Limiter,
+				Limiter:       route.Limiter,
 				Matched:       true,
 			}
-
 			if route.RewriteRule != nil {
 				result.RewrittenPath = p.applyRewrite(path, route)
 			}
-
 			return result
 		}
 	}
-
 	return RouteResult{
 		Target:        p.Target,
-		TLS:           p.TLS,
+		Terminate:     p.Terminate,
 		RewrittenPath: path,
-		limiter:       p.Limiter,
+		Limiter:       p.Limiter,
 		Matched:       false,
 	}
 }
@@ -105,12 +102,10 @@ func (p *Proxy) applyRewrite(path string, route *Route) string {
 	if route.RewriteRule == nil {
 		return path
 	}
-
 	// Use compiled regex if available
 	if route.regex != nil {
 		return route.regex.ReplaceAllString(path, route.RewriteRule.To)
 	}
-
 	// Fallback to simple string replacement
 	return strings.ReplaceAll(path, route.RewriteRule.From, route.RewriteRule.To)
 }
@@ -120,12 +115,10 @@ func matchesRoute(path, pattern string) bool {
 	if path == pattern {
 		return true
 	}
-
 	if strings.HasSuffix(pattern, "/*") {
 		prefix := strings.TrimSuffix(pattern, "/*")
 		return strings.HasPrefix(path, prefix+"/") || path == prefix
 	}
-
 	if strings.HasPrefix(path, pattern) {
 		if len(path) == len(pattern) {
 			return true
@@ -134,7 +127,6 @@ func matchesRoute(path, pattern string) bool {
 			return true
 		}
 	}
-
 	return false
 }
 
@@ -145,7 +137,6 @@ func (p *Proxy) AddRoute(pattern, target string, rewrite *RewriteRule) {
 		Target:      target,
 		RewriteRule: rewrite,
 	}
-
 	p.Routes = append(p.Routes, route)
 	p.sortRoutes()
 }

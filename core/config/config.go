@@ -12,13 +12,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const (
-	ProtoTLS   = "tls"
-	ProtoTCP   = "tcp"
-	ProtoHTTP  = "http"
-	ProtoHTTPS = "https"
-)
-
 type LimiterConfig struct {
 	Rate     int   `yaml:"rate"`
 	Burst    int   `yaml:"burst"`
@@ -28,16 +21,17 @@ type LimiterConfig struct {
 type RouteConfig struct {
 	Pattern     string         `yaml:"pattern"`
 	Target      string         `yaml:"target"`
-	TLS         bool           `yaml:"tls,omitempty"`
+	Terminate   bool           `yaml:"terminate,omitempty"`
 	RewriteRule *RewriteRule   `yaml:"rewrite,omitempty"`
 	Limiter     *LimiterConfig `yaml:"rate_limit,omitempty"`
 }
 
 type ProxyConfig struct {
-	Target  string         `yaml:"target"`
-	TLS     bool           `yaml:"tls,omitempty"`
-	Routes  []*RouteConfig `yaml:"routes,omitempty"`
-	Limiter *LimiterConfig `yaml:"rate_limit,omitempty"`
+	Target    string         `yaml:"target"`
+	Proto     string         `yaml:"proto"`
+	Terminate bool           `yaml:"terminate,omitempty"`
+	Routes    []*RouteConfig `yaml:"routes,omitempty"`
+	Limiter   *LimiterConfig `yaml:"rate_limit,omitempty"`
 }
 
 // ConfigFile represents the YAML structure.
@@ -52,8 +46,8 @@ type Config struct {
 	GlobalLimiter *limiter.Limiter
 }
 
-// NewConfig creates a new configuration instance.
-func NewConfig() *Config {
+// New creates a new configuration instance.
+func New() *Config {
 	return &Config{
 		Proxies: NewTrie[*Proxy](),
 	}
@@ -93,9 +87,10 @@ func (c *Config) loadProxies(configFile ConfigFile) error {
 		}
 
 		p := &Proxy{
-			Target:  proxy.Target,
-			TLS:     proxy.TLS,
-			Metrics: metrics.New(),
+			Proto:     proxy.Proto,
+			Target:    proxy.Target,
+			Terminate: proxy.Terminate,
+			Metrics:   metrics.New(),
 		}
 
 		if proxy.Limiter != nil {
@@ -111,7 +106,7 @@ func (c *Config) loadProxies(configFile ConfigFile) error {
 			for i, routeConf := range proxy.Routes {
 				route := &Route{
 					Target:      routeConf.Target,
-					TLS:         routeConf.TLS,
+					Terminate:   routeConf.Terminate,
 					Pattern:     routeConf.Pattern,
 					RewriteRule: routeConf.RewriteRule,
 				}
