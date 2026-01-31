@@ -4,6 +4,13 @@ global_rate_limit:
   cooldown: 10
 
 proxies:
+  default:
+    target: "localhost:8889"
+    rate_limit:
+      rate: 20
+      burst: 25
+      cooldown: 5
+
   filespace.dyastin.dev:
     target: "localhost:3011"
     terminate: true

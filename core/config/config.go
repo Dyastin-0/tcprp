@@ -146,6 +146,11 @@ func (c *Config) GetProxy(domain string) *Proxy {
 	if proxy := c.Proxies.Get(domain); proxy != nil {
 		return *proxy
 	}
+
+	if defaultProxy := c.Proxies.Get("default"); defaultProxy != nil {
+		return *defaultProxy
+	}
+
 	return nil
 }
 
