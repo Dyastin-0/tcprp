@@ -20,9 +20,15 @@ proxies:
         target: "localhost:3010"
         
   pprof.dyastin.dev:
+    target: "localhost:6060"
+    terminate: true
+    proto: http
+
+  pprof.wormhole.dyastin.dev:
     target: "localhost:7060"
     terminate: true
     proto: http
+ 
     
   dyastin.dev:
     target: "localhost:3111"

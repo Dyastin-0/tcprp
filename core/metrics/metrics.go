@@ -1,4 +1,4 @@
-// Package metrics implement a metrics for an io.ReadWriter.
+// Package metrics implement a metrics for an io.ReadWriteCloser.
 package metrics
 
 import (
@@ -7,43 +7,48 @@ import (
 	"time"
 )
 
-// MetricsReadWriter implements io.ReadWriter.
-type MetricsReadWriter struct {
-	rw      io.ReadWriter
+// MetricsReadWriteCLoser implements io.ReadWriteCloser.
+type MetricsReadWriteCloser struct {
+	rwc     io.ReadWriteCloser
 	metrics *Metrics
 }
 
-// NewMetricsReadWriter returns a new MetricsReadWriter.
-func NewMetricsReadWriter(rw io.ReadWriter, m *Metrics) *MetricsReadWriter {
-	return &MetricsReadWriter{
-		rw:      rw,
+// NewMetricsReadWriteCloser returns a new MetricsReadWriteCloser.
+func NewMetricsReadWriteCloser(rwc io.ReadWriteCloser, m *Metrics) *MetricsReadWriteCloser {
+	return &MetricsReadWriteCloser{
+		rwc:     rwc,
 		metrics: m,
 	}
 }
 
-// Read reads p using the underlying io.ReadWriter and adds n in the ingress metrics.
-func (mrw *MetricsReadWriter) Read(p []byte) (n int, err error) {
-	n, err = mrw.rw.Read(p)
+// Read reads p using the underlying io.ReadWriteCLoser and adds n in the ingress metrics.
+func (mrwc *MetricsReadWriteCloser) Read(p []byte) (n int, err error) {
+	n, err = mrwc.rwc.Read(p)
 	if n > 0 {
-		mrw.metrics.AddIngressBytes(uint64(n))
+		mrwc.metrics.AddIngressBytes(uint64(n))
 	}
 	return n, err
 }
 
-// Write writes p using the underlying io.ReadWriter and adds n in the egress metrics.
-func (mrw *MetricsReadWriter) Write(p []byte) (n int, err error) {
-	n, err = mrw.rw.Write(p)
+// Write writes p using the underlying io.ReadWriteCLoser and adds n in the egress metrics.
+func (mrwc *MetricsReadWriteCloser) Write(p []byte) (n int, err error) {
+	n, err = mrwc.rwc.Write(p)
 	if n > 0 {
-		mrw.metrics.AddEgressBytes(uint64(n))
+		mrwc.metrics.AddEgressBytes(uint64(n))
 	}
 	return n, err
+}
+
+// Close closes the underlying io.ReadWriteCloser.
+func (mrwc *MetricsReadWriteCloser) Close() error {
+	return mrwc.rwc.Close()
 }
 
 // Metrics represents data ingress/egress metrics for a network connection.
 type Metrics struct {
 	// IngressBytes represents the total bytes received from external connections (ingress).
 	IngressBytes uint64
-	// EgressBytes represents the total outgoing total bytes (egressactive ).
+	// EgressBytes represents the total outgoing total bytes (egress).
 	EgressBytes uint64
 	// ConnectionCount specifies the total number of connections.
 	ConnectionCount uint64
@@ -51,9 +56,14 @@ type Metrics struct {
 	StartTime time.Time
 	// ActiveConnections represents current active connections.
 	ActiveConnections int32
+	// RTT represent the single roundtrip latency.
+	RTT uint32
+	// Track last reported values for delta calculation.
+	lastIngressBytes uint64
+	lastEgressBytes  uint64
 }
 
-// NewMetrics creates a new Metrics instance.
+// New creates a new Metrics instance.
 func New() *Metrics {
 	return &Metrics{
 		StartTime: time.Now(),
@@ -101,34 +111,40 @@ func (m *Metrics) GetActiveConnections() int32 {
 	return atomic.LoadInt32(&m.ActiveConnections)
 }
 
-// GetUptime returns how long metrics have been collected.
+// GetIngressBytesDelta returns the delta since last check and updates the last value.
+func (m *Metrics) GetIngressBytesDelta() uint64 {
+	current := atomic.LoadUint64(&m.IngressBytes)
+	last := atomic.LoadUint64(&m.lastIngressBytes)
+	delta := current - last
+	atomic.StoreUint64(&m.lastIngressBytes, current)
+	return delta
+}
+
+// GetEgressBytesDelta returns the delta since last check and updates the last value.
+func (m *Metrics) GetEgressBytesDelta() uint64 {
+	current := atomic.LoadUint64(&m.EgressBytes)
+	last := atomic.LoadUint64(&m.lastEgressBytes)
+	delta := current - last
+	atomic.StoreUint64(&m.lastEgressBytes, current)
+	return delta
+}
+
+// SetRTT atomically sets the RTT value.
+func (m *Metrics) SetRTT(rtt uint32) {
+	atomic.StoreUint32(&m.RTT, rtt)
+}
+
+// GetRTT atomically gets the RTT value.
+func (m *Metrics) GetRTT() uint32 {
+	return atomic.LoadUint32(&m.RTT)
+}
+
+// GetUptime returns the duration since metrics started.
 func (m *Metrics) GetUptime() time.Duration {
 	return time.Since(m.StartTime)
 }
 
-// GetIngressRate return bytes per second since start.
-func (m *Metrics) GetIngressRate() float64 {
-	uptime := m.GetUptime()
-	if uptime == 0 {
-		return 0
-	}
-	return float64(m.GetIngressBytes()) / uptime.Seconds()
-}
-
-// GetEgressRate return bytes per second since start.
-func (m *Metrics) GetEgressRate() float64 {
-	uptime := m.GetUptime()
-	if uptime == 0 {
-		return 0
-	}
-
-	return float64(m.GetEgressBytes()) / uptime.Seconds()
-}
-
-// NewProxyReadWriter return a new MetricsReadWriter using the underlying metrics.
-func (m *Metrics) NewProxyReadWriter(rw io.ReadWriter) *MetricsReadWriter {
-	return &MetricsReadWriter{
-		rw:      rw,
-		metrics: m,
-	}
+// NewProxyReadWriteCloser return a new MetricsReadWriteCLoser using the underlying metrics.
+func (m *Metrics) NewProxyReadWriteCloser(rwc io.ReadWriteCloser) *MetricsReadWriteCloser {
+	return NewMetricsReadWriteCloser(rwc, m)
 }

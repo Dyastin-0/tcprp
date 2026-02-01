@@ -43,6 +43,8 @@ func (p *Proxy) Handler(conn net.Conn) error {
 		return fmt.Errorf("no proxy found for SNI: %s", sni)
 	}
 
+	fmt.Printf("SNI: %s\n", sni)
+
 	if proxy.Terminate {
 		conn = tls.Server(conn, p.TLSConfig)
 		if proxy.Proto == ProtoHTTP {
@@ -121,9 +123,9 @@ func (p *Proxy) http(conn net.Conn, proxy *config.Proxy) error {
 			clientConn := &BuffConn{Conn: conn, r: bufrd}
 			backendConn := &BuffConn{Conn: backend, r: backendReader}
 
-			var rw io.ReadWriter = clientConn
+			var rw io.ReadWriteCloser = clientConn
 			if proxy.Metrics != nil {
-				rw = proxy.Metrics.NewProxyReadWriter(clientConn)
+				rw = proxy.Metrics.NewProxyReadWriteCloser(clientConn)
 			}
 
 			return Stream(rw, backendConn)
@@ -151,9 +153,9 @@ func (p *Proxy) stream(conn net.Conn, proxy *config.Proxy) error {
 	}
 	defer backend.Close()
 
-	var rw io.ReadWriter = conn
+	var rw io.ReadWriteCloser = conn
 	if proxy.Metrics != nil {
-		rw = proxy.Metrics.NewProxyReadWriter(conn)
+		rw = proxy.Metrics.NewProxyReadWriteCloser(conn)
 	}
 
 	return Stream(rw, backend)
