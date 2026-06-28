@@ -44,7 +44,7 @@ proxies:
       - pattern: "/api/*"
         target: "echos:8080"
 
-    wormhole.dyastin.dev:
+  wormhole.dyastin.dev:
     target: "wormhole:8881"
     terminate: true
     rate_limit:
