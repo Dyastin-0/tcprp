@@ -8,7 +8,6 @@ import (
 	"net"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/Dyastin-0/tcprp/core/config"
 )
@@ -67,9 +66,6 @@ func (p *Proxy) http(conn net.Conn, proxy *config.Proxy) error {
 
 	for {
 		req, err := http.ReadRequest(bufrd)
-
-		conn.SetReadDeadline(time.Time{})
-
 		if err != nil {
 			if err == io.EOF || isTimeout(err) {
 				return nil
