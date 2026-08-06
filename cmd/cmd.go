@@ -5,7 +5,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net"
+	"net/http"
 
 	"github.com/Dyastin-0/tcprp/core"
 	"github.com/Dyastin-0/tcprp/core/proxy"
@@ -63,6 +65,11 @@ func startCommand() *cli.Command {
 				Aliases: []string{"a"},
 				Value:   ":443",
 			},
+			&cli.StringFlag{
+				Name:    "metrics-addr",
+				Value:   ":9091",
+				Usage:   "address for the Prometheus /metrics endpoint",
+			},
 		},
 		Action: startAction,
 	}
@@ -73,12 +80,22 @@ func startAction(ctx context.Context, cmd *cli.Command) error {
 	api := cmd.String("api")
 	email := cmd.String("email")
 	addr := cmd.String("addr")
+	metricsAddr := cmd.String("metrics-addr")
 
 	proxy := proxy.New()
 	err := proxy.Config.Load(configPath)
 	if err != nil {
 		return err
 	}
+
+	metricsMux := http.NewServeMux()
+	metricsMux.Handle("/metrics", metricsHandler(proxy.Config.Proxies))
+	go func() {
+		log.Printf("metrics server listening on %s/metrics", metricsAddr)
+		if err := http.ListenAndServe(metricsAddr, metricsMux); err != nil {
+			log.Printf("metrics server error: %v", err)
+		}
+	}()
 
 	provider := &cloudflare.Provider{
 		APIToken: api,

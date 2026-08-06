@@ -12,7 +12,7 @@ func TestMetricsReadWriter(t *testing.T) {
 	buf := bytes.NewBuffer(data)
 
 	m := New()
-	mrw := NewMetricsReadWriter(buf, m)
+	mrw := NewMetricsReadWriteCloser(readWriteCloser{buf}, m)
 
 	readBuf := make([]byte, len(data))
 	n, err := mrw.Read(readBuf)
@@ -26,3 +26,9 @@ func TestMetricsReadWriter(t *testing.T) {
 	require.Equal(t, len(writeData), n)
 	require.Equal(t, uint64(n), m.GetEgressBytes())
 }
+
+type readWriteCloser struct {
+	*bytes.Buffer
+}
+
+func (readWriteCloser) Close() error { return nil }
