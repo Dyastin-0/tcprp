@@ -19,7 +19,6 @@ type PromCollector struct {
 	egressBytes  *prometheus.Desc
 	connections  *prometheus.Desc
 	activeConns  *prometheus.Desc
-	rtt          *prometheus.Desc
 	uptime       *prometheus.Desc
 }
 
@@ -32,7 +31,6 @@ func NewPromCollector(snapshot func() []Snapshot) *PromCollector {
 		egressBytes:  prometheus.NewDesc("tcprp_egress_bytes_total", "Total bytes sent to external connections (egress).", labels, nil),
 		connections:  prometheus.NewDesc("tcprp_connections_total", "Total number of connections handled.", labels, nil),
 		activeConns:  prometheus.NewDesc("tcprp_active_connections", "Current number of active connections.", labels, nil),
-		rtt:          prometheus.NewDesc("tcprp_roundtrip_milliseconds", "Last measured roundtrip latency.", labels, nil),
 		uptime:       prometheus.NewDesc("tcprp_uptime_seconds", "Seconds since the proxy started.", labels, nil),
 	}
 }
@@ -43,7 +41,6 @@ func (c *PromCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.egressBytes
 	ch <- c.connections
 	ch <- c.activeConns
-	ch <- c.rtt
 	ch <- c.uptime
 }
 
@@ -58,7 +55,6 @@ func (c *PromCollector) Collect(ch chan<- prometheus.Metric) {
 		ch <- prometheus.MustNewConstMetric(c.egressBytes, prometheus.CounterValue, float64(s.Metrics.GetEgressBytes()), labels...)
 		ch <- prometheus.MustNewConstMetric(c.connections, prometheus.CounterValue, float64(s.Metrics.GetConnectionCount()), labels...)
 		ch <- prometheus.MustNewConstMetric(c.activeConns, prometheus.GaugeValue, float64(s.Metrics.GetActiveConnections()), labels...)
-		ch <- prometheus.MustNewConstMetric(c.rtt, prometheus.GaugeValue, float64(s.Metrics.GetRTT()), labels...)
 		ch <- prometheus.MustNewConstMetric(c.uptime, prometheus.GaugeValue, s.Metrics.GetUptime().Seconds(), labels...)
 	}
 }

@@ -43,6 +43,11 @@ func (p *Proxy) Handler(conn net.Conn) error {
 		return fmt.Errorf("no proxy found for SNI: %s", sni)
 	}
 
+	if proxy.Metrics != nil {
+		proxy.Metrics.IncrementConnections()
+		defer proxy.Metrics.DecrementActiveConnections()
+	}
+
 	fmt.Printf("SNI: %s\n", sni)
 
 	if proxy.Terminate {
