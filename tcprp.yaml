@@ -10,55 +10,48 @@ proxies:
       rate: 20
       burst: 25
       cooldown: 5
- 
-  pprof.wormhole.dyastin.dev:
+  pprof.wormhole.justineparalejas.dev:
     target: "wormhole:7060"
     terminate: true
     proto: http
-
-  dyastin.dev:
+  justineparalejas.dev:
     target: "blog-ui:3111"
     terminate: true
     proto: http
     routes:
       - pattern: "/api/v1/*"
         target: "blog-api:8081"
-
-  grafana.dyastin.dev:
-    target: "localhost:3000"   
+  grafana.justineparalejas.dev:
+    target: "localhost:3000"
     terminate: true
     proto: http
-
-  '*.wormhole.dyastin.dev':
+  '*.wormhole.justineparalejas.dev':
     target: "wormhole:8889"
     rate_limit:
       rate: 20
       burst: 25
       cooldown: 5
-
-  echos.dyastin.dev:
+  echos.justineparalejas.dev:
     target: "echosf:42020"
     terminate: true
     proto: http
     routes:
       - pattern: "/api/*"
-        target: "echos:8080"
-
-  wormhole.dyastin.dev:
+        target: "host-gateway:8080"
+  wormhole.justineparalejas.dev:
     target: "wormhole:8881"
     terminate: true
     rate_limit:
       rate: 5
       burst: 10
       cooldown: 10
-
-  atlas.dyastin.dev:
+  atlas.justineparalejas.dev:
     target: "atlas-ui:8111"
     terminate: true
     proto: http
     routes:
       - pattern: "/api/*"
-        target: "atlas:8082"   
+        target: "atlas:8000"
         rewrite:
           from: "^/api/ws"
           to: "/ws"
