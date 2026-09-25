@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strings"
 
 	"github.com/Dyastin-0/tcprp/core"
 	"github.com/Dyastin-0/tcprp/core/proxy"
@@ -66,9 +67,9 @@ func startCommand() *cli.Command {
 				Value:   ":443",
 			},
 			&cli.StringFlag{
-				Name:    "metrics-addr",
-				Value:   ":9091",
-				Usage:   "address for the Prometheus /metrics endpoint",
+				Name:  "metrics-addr",
+				Value: ":9091",
+				Usage: "address for the Prometheus /metrics endpoint",
 			},
 		},
 		Action: startAction,
@@ -113,8 +114,16 @@ func startAction(ctx context.Context, cmd *cli.Command) error {
 
 	domains := proxy.Config.Proxies.GetKeysWithVal()
 
+	var certDomains []string
+	for _, domain := range domains {
+		if domain == "default" || !strings.Contains(domain, ".") {
+			continue
+		}
+		certDomains = append(certDomains, domain)
+	}
+
 	magic := certmagic.NewDefault()
-	err = magic.ManageAsync(ctx, domains)
+	err = magic.ManageAsync(ctx, certDomains)
 	if err != nil {
 		return err
 	}
