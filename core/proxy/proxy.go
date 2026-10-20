@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"strings"
@@ -37,6 +38,30 @@ func (p *Proxy) Handler(conn net.Conn) error {
 	}
 
 	sni := conn.(*TLSConn).Host()
+
+	if pattern, blocked := p.Config.Blocklist.Match(sni); blocked {
+		if p.Config.Blocklist.Hit(pattern) {
+			log.Printf("blocked SNI %q (rule %q)", sni, pattern)
+		}
+		conn.Close()
+		return fmt.Errorf("blocked SNI: %s", sni)
+	}
+
+	if p.Config.Proxies.Get(sni) == nil {
+		if p.Config.Unknown != nil {
+			if isNew := p.Config.Unknown.Observe(sni); isNew {
+				log.Printf("unknown SNI %q (no matching proxy rule)", sni)
+			}
+		}
+		if p.Config.BlockUnknown {
+			if p.Config.Unknown != nil {
+				p.Config.Unknown.Block()
+			}
+			conn.Close()
+			return fmt.Errorf("unknown SNI blocked: %s", sni)
+		}
+	}
+
 	proxy := p.Config.GetProxy(sni)
 	if proxy == nil {
 		conn.Close()
@@ -71,6 +96,7 @@ func (p *Proxy) http(conn net.Conn, proxy *config.Proxy) error {
 	bufrd := bufio.NewReader(conn)
 
 	for {
+		start := time.Now()
 		req, err := http.ReadRequest(bufrd)
 
 		conn.SetReadDeadline(time.Time{})
@@ -99,11 +125,17 @@ func (p *Proxy) http(conn net.Conn, proxy *config.Proxy) error {
 
 		backend, err := net.Dial("tcp", route.Target)
 		if err != nil {
+			if proxy.Metrics != nil {
+				proxy.Metrics.AddBackendError()
+			}
 			p.writeError(conn, http.StatusBadGateway, "Failed to connect to backend")
 			return err
 		}
 
 		if err = req.Write(backend); err != nil {
+			if proxy.Metrics != nil {
+				proxy.Metrics.AddBackendError()
+			}
 			backend.Close()
 			p.writeError(conn, http.StatusBadGateway, "Failed to send request")
 			return err
@@ -112,9 +144,16 @@ func (p *Proxy) http(conn net.Conn, proxy *config.Proxy) error {
 		backendReader := bufio.NewReader(backend)
 		resp, err := http.ReadResponse(backendReader, req)
 		if err != nil {
+			if proxy.Metrics != nil {
+				proxy.Metrics.AddBackendError()
+			}
 			backend.Close()
 			p.writeError(conn, http.StatusBadGateway, "Failed to read response")
 			return err
+		}
+
+		if proxy.Metrics != nil {
+			proxy.Metrics.AddHTTPRequest(resp.StatusCode, time.Since(start))
 		}
 
 		if err := resp.Write(conn); err != nil {
@@ -154,6 +193,9 @@ func (p *Proxy) stream(conn net.Conn, proxy *config.Proxy) error {
 
 	backend, err := net.Dial("tcp", proxy.Target)
 	if err != nil {
+		if proxy.Metrics != nil {
+			proxy.Metrics.AddBackendError()
+		}
 		return err
 	}
 	defer backend.Close()
