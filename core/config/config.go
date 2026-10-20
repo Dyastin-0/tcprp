@@ -36,20 +36,42 @@ type ProxyConfig struct {
 
 // ConfigFile represents the YAML structure.
 type ConfigFile struct {
-	Proxies       map[string]ProxyConfig `yaml:"proxies"`
-	GlobalLimiter *LimiterConfig         `yaml:"global_rate_limit,omitempty"`
+	Proxies        map[string]ProxyConfig `yaml:"proxies"`
+	GlobalLimiter  *LimiterConfig         `yaml:"global_rate_limit,omitempty"`
+	BlockedDomains []string               `yaml:"blocked_domains,omitempty"`
+	BlockUnknown   bool                   `yaml:"block_unknown,omitempty"`
 }
 
 // Config holds the loaded configuration.
 type Config struct {
 	Proxies       *Trie[*Proxy]
 	GlobalLimiter *limiter.Limiter
+	Blocklist     *Blocklist
+	BlockUnknown  bool
+	Unknown       *metrics.UnknownSNITracker
 }
 
 // New creates a new configuration instance.
 func New() *Config {
 	return &Config{
-		Proxies: NewTrie[*Proxy](),
+		Proxies:   NewTrie[*Proxy](),
+		Blocklist: NewBlocklist(nil),
+		Unknown:   metrics.NewUnknownSNITracker(metrics.DefaultUnknownMaxEntries),
+	}
+}
+
+// MetricsStats returns a snapshot of global (non per-proxy) metrics.
+func (c *Config) MetricsStats() metrics.Stats {
+	if c.Unknown == nil {
+		c.Unknown = metrics.NewUnknownSNITracker(metrics.DefaultUnknownMaxEntries)
+	}
+	total, blocked, entries := c.Unknown.Snapshot()
+	return metrics.Stats{
+		UnknownTotal:   total,
+		UnknownUnique:  len(entries),
+		UnknownEntries: entries,
+		BlockedUnknown: blocked,
+		Blocked:        c.Blocklist.Snapshot(),
 	}
 }
 
@@ -73,6 +95,9 @@ func (c *Config) LoadBytes(data []byte) error {
 
 // loadProxies loads proxy configurations into the trie.
 func (c *Config) loadProxies(configFile ConfigFile) error {
+	c.BlockUnknown = configFile.BlockUnknown
+	c.Blocklist = NewBlocklist(configFile.BlockedDomains)
+
 	if configFile.GlobalLimiter != nil {
 		c.GlobalLimiter = limiter.New(
 			limiter.WithBurst(configFile.GlobalLimiter.Burst),

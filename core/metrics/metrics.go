@@ -58,6 +58,18 @@ type Metrics struct {
 	ActiveConnections int32
 	// RTT represent the single roundtrip latency.
 	RTT uint32
+	// HTTPRequests counts parsed HTTP requests.
+	HTTPRequests uint64
+	// HTTP1xx through HTTP5xx count responses by status class.
+	HTTP1xx uint64
+	HTTP2xx uint64
+	HTTP3xx uint64
+	HTTP4xx uint64
+	HTTP5xx uint64
+	// HTTPDurationMicros sums request durations in microseconds.
+	HTTPDurationMicros uint64
+	// BackendErrors counts failures dialing or talking to backends.
+	BackendErrors uint64
 	// Track last reported values for delta calculation.
 	lastIngressBytes uint64
 	lastEgressBytes  uint64
@@ -142,6 +154,56 @@ func (m *Metrics) GetRTT() uint32 {
 // GetUptime returns the duration since metrics started.
 func (m *Metrics) GetUptime() time.Duration {
 	return time.Since(m.StartTime)
+}
+
+// AddHTTPRequest records one HTTP request, its response status and duration.
+func (m *Metrics) AddHTTPRequest(statusCode int, duration time.Duration) {
+	atomic.AddUint64(&m.HTTPRequests, 1)
+	atomic.AddUint64(&m.HTTPDurationMicros, uint64(duration.Microseconds()))
+
+	switch {
+	case statusCode < 200:
+		atomic.AddUint64(&m.HTTP1xx, 1)
+	case statusCode < 300:
+		atomic.AddUint64(&m.HTTP2xx, 1)
+	case statusCode < 400:
+		atomic.AddUint64(&m.HTTP3xx, 1)
+	case statusCode < 500:
+		atomic.AddUint64(&m.HTTP4xx, 1)
+	default:
+		atomic.AddUint64(&m.HTTP5xx, 1)
+	}
+}
+
+// AddBackendError records a failure dialing or communicating with a backend.
+func (m *Metrics) AddBackendError() {
+	atomic.AddUint64(&m.BackendErrors, 1)
+}
+
+// GetHTTPRequests returns the total number of HTTP requests.
+func (m *Metrics) GetHTTPRequests() uint64 {
+	return atomic.LoadUint64(&m.HTTPRequests)
+}
+
+// GetHTTPStatusCounts returns request counts grouped as 1xx..5xx.
+func (m *Metrics) GetHTTPStatusCounts() [5]uint64 {
+	return [5]uint64{
+		atomic.LoadUint64(&m.HTTP1xx),
+		atomic.LoadUint64(&m.HTTP2xx),
+		atomic.LoadUint64(&m.HTTP3xx),
+		atomic.LoadUint64(&m.HTTP4xx),
+		atomic.LoadUint64(&m.HTTP5xx),
+	}
+}
+
+// GetHTTPDuration returns the total time spent serving HTTP requests.
+func (m *Metrics) GetHTTPDuration() time.Duration {
+	return time.Duration(atomic.LoadUint64(&m.HTTPDurationMicros)) * time.Microsecond
+}
+
+// GetBackendErrors returns the number of backend failures.
+func (m *Metrics) GetBackendErrors() uint64 {
+	return atomic.LoadUint64(&m.BackendErrors)
 }
 
 // NewProxyReadWriteCloser return a new MetricsReadWriteCLoser using the underlying metrics.

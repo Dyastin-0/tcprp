@@ -90,7 +90,8 @@ func startAction(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	metricsMux := http.NewServeMux()
-	metricsMux.Handle("/metrics", metricsHandler(proxy.Config.Proxies))
+	metricsMux.Handle("/metrics", metricsHandler(proxy.Config))
+	metricsMux.Handle("/debug/unknown-sni", unknownSNIHandler(proxy.Config))
 	go func() {
 		log.Printf("metrics server listening on %s/metrics", metricsAddr)
 		if err := http.ListenAndServe(metricsAddr, metricsMux); err != nil {
