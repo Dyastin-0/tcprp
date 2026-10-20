@@ -2,6 +2,17 @@ global_rate_limit:
   rate: 50
   burst: 100
   cooldown: 10
+
+# Reject SNIs that match no proxy rule instead of routing them to 'default'.
+# (Unknown SNIs are counted and listed at /debug/unknown-sni either way.)
+block_unknown: false
+
+# Reject these SNIs before routing. Exact domains or wildcard suffixes.
+# blocked_domains:
+#   - "scanner.example.com"
+#   - "*.spam.example.com"
+blocked_domains: []
+
 proxies:
   default:
     target: "wormhole:8889"
