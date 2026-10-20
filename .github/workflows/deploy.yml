@@ -55,5 +55,5 @@ jobs:
 
       - name: Pull and restart service
         run: |
-          ssh -i ~/.ssh/deploy_key -p "${{ secrets.VPS_PORT }}" "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
-            "cd /opt/tcprp && docker compose pull ${{ env.SERVICE_NAME }} && docker compose up -d ${{ env.SERVICE_NAME }} && docker compose ps ${{ env.SERVICE_NAME }}"
+          echo "${{ secrets.GHCR_TOKEN }}" | ssh -i ~/.ssh/deploy_key -p "${{ secrets.VPS_PORT }}" "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
+            "docker login ghcr.io -u ${{ github.actor }} --password-stdin && cd /opt/tcprp && docker compose pull ${{ env.SERVICE_NAME }} && docker compose up -d ${{ env.SERVICE_NAME }} && docker compose ps ${{ env.SERVICE_NAME }}"
